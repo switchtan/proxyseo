@@ -1,46 +1,53 @@
 package com.guava.proxy.controller;
 
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import com.guava.proxy.Util.HttpHelper;
+import com.guava.proxy.regex.GetCss;
+import org.eclipse.jetty.server.Request;
+import org.eclipse.jetty.server.handler.AbstractHandler;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
-import javax.validation.constraints.Null;
-
-import com.guava.proxy.Util.HttpHelper;
-import org.eclipse.jetty.server.Request;
-import org.eclipse.jetty.server.handler.AbstractHandler;
-
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+@Component
 public class JettyReceive extends AbstractHandler {
 
     @Override
     public void handle(String url, Request baseRequest, HttpServletRequest request, HttpServletResponse response)
             throws IOException, ServletException {
-        if(url.indexOf("css")>-1){
+        boolean isReturned=false;
+        Pattern p = Pattern.compile("\\.css$");
+        Matcher m=p.matcher(url);
+        if(m.find()){
             response.getWriter().println(".guava{}");
             //response.flushBuffer();
             baseRequest.setHandled(true);
+            isReturned=true;
         }
-        System.out.println("url:"+url);
-        System.out.println("domain name:"+request.getHeader("From"));
-        System.out.println("host name:"+request.getHeader("Host"));
-        System.out.println("ip:"+getIpAdrress(request));
-        System.out.println("body:"+getBodyDate(request));
-        //response.setContentType("application/json");
-        response.setContentType("text/html;charset=UTF-8");
-        response.setStatus(HttpServletResponse.SC_OK);
-        HttpHelper httpHelper =new HttpHelper();
-        try {
-            String html=httpHelper.sentGet("https://www.36kr.com/");
-            String css="//sta.36krcnd.com/36krx2018-front/static/app.5e79c64d.css";
-            html=html.replace(css,"/a.css");
-            response.getWriter().println(html);
-            //response.flushBuffer();
-            baseRequest.setHandled(true);
-        } catch (InterruptedException e) {
-            e.printStackTrace();
+
+        if(isReturned==false) {
+            printHeader(url,request);
+            //response.setContentType("application/json");
+            response.setContentType("text/html;charset=UTF-8");
+            response.setStatus(HttpServletResponse.SC_OK);
+            HttpHelper httpHelper = new HttpHelper();
+            try {
+                String html = httpHelper.sentGet("https://www.36kr.com/");
+                GetCss getCss=new GetCss();
+                html=getCss.getC(html);
+                response.getWriter().println(html);
+                //response.flushBuffer();
+                baseRequest.setHandled(true);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
         }
 
     }
@@ -102,6 +109,13 @@ public class JettyReceive extends AbstractHandler {
             ip = request.getRemoteAddr();
         }
         return ip;
+    }
+    private void printHeader(String url,HttpServletRequest request){
+        System.out.println("url:" + url);
+        System.out.println("domain name:" + request.getHeader("From"));
+        System.out.println("host name:" + request.getHeader("Host"));
+        System.out.println("ip:" + getIpAdrress(request));
+        //System.out.println("body:" + getBodyDate(request));
     }
 
 }

@@ -18,7 +18,9 @@ import javax.sql.DataSource;
 import java.util.Properties;
 
 @Configuration
-@ComponentScan(value={"com.guava.proxy.database","com.guava.proxy.Util"})
+@ComponentScan(value={"com.guava.proxy.database","com.guava.proxy.Util"
+                    ,"com.guava.proxy.controller"
+        ,"com.guava.proxy.regex"})
 @EnableTransactionManagement
 @PropertySource(value = { "classpath:application.properties" })
 public class AppConfig {
