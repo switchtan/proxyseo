@@ -2,6 +2,7 @@ package com.guava.proxy.controller;
 
 
 import com.guava.proxy.Util.HttpHelper;
+import com.guava.proxy.Util.SettingHelper;
 import com.guava.proxy.regex.GetCss;
 import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.handler.AbstractHandler;
@@ -26,6 +27,8 @@ import java.io.InputStreamReader;
 public class JettyReceive extends AbstractHandler {
     private CacheManager cm=null;
     private Cache<String, String> cssCache=null;
+    private Cache<String, String> htmlCache=null;
+    private SettingHelper settingHelper=new SettingHelper();
     JettyReceive(){
         if(cm==null) {
             cm = this.getCacheManager();
@@ -36,7 +39,10 @@ public class JettyReceive extends AbstractHandler {
     @Override
     public void handle(String url, Request baseRequest, HttpServletRequest request, HttpServletResponse response)
             throws IOException, ServletException {
-        String baseUrl_noroot="https://www.36kr.com";
+
+        String baseUrl_noroot=settingHelper.get("localhost");
+        System.out.println(request.getHeader("Host"));
+        System.out.println(baseUrl_noroot);
         String baseUrl=baseUrl_noroot+"/";
         if(url.indexOf(baseUrl_noroot)>-1){
             url=url.replace(baseUrl_noroot,"");
@@ -70,16 +76,26 @@ public class JettyReceive extends AbstractHandler {
         if(isReturned==false) {
             System.out.println("no css file");
 
-            printHeader(url,request);
+
             //response.setContentType("application/json");
             response.setContentType("text/html;charset=UTF-8");
             response.setStatus(HttpServletResponse.SC_OK);
             HttpHelper httpHelper = new HttpHelper();
             try {
-                String html = httpHelper.sentGet("https://www.36kr.com"+url);
-                GetCss getCss=new GetCss(cssCache);
-                html=getCss.getC(html);
-                html=html.replace(baseUrl_noroot,"");
+                String html =null;
+                if(htmlCache.containsKey(baseUrl_noroot+url)){
+                    html=htmlCache.get(baseUrl_noroot+url);
+                    System.out.println("cache state:this html in cache");
+                }else{
+                    printHeader(url,request,response);
+                    html = httpHelper.sentGet(baseUrl_noroot+url);
+                    GetCss getCss=new GetCss(cssCache);
+                    html=getCss.getC(html);
+                    html=html.replace(baseUrl_noroot,"");
+                    htmlCache.put(baseUrl_noroot+url,html);
+                }
+
+
                 response.getWriter().println(html);
 
                 //response.flushBuffer();
@@ -149,11 +165,12 @@ public class JettyReceive extends AbstractHandler {
         }
         return ip;
     }
-    private void printHeader(String url,HttpServletRequest request){
+    private void printHeader(String url, HttpServletRequest request, HttpServletResponse response){
 
         System.out.println("url:" + url);
         //System.out.println("domain name:" + request.getHeader("From"));
         System.out.println("host name:" + request.getHeader("Host"));
+        System.out.println("host name:" + response.getHeader("Location"));
         System.out.println("ip:" + getIpAdrress(request));
         //System.out.println("body:" + getBodyDate(request));
     }
@@ -169,6 +186,11 @@ public class JettyReceive extends AbstractHandler {
                                         .disk(20, MemoryUnit.MB, true)
                         )
                 ).build(true);
+        htmlCache = persistentCacheManager.createCache("htmlCache",
+                CacheConfigurationBuilder.newCacheConfigurationBuilder(String.class, String.class, ResourcePoolsBuilder.newResourcePoolsBuilder()
+                        .heap(10, EntryUnit.ENTRIES)
+                        .offheap(1, MemoryUnit.MB)
+                        .disk(20, MemoryUnit.MB, true)));
         return persistentCacheManager;
     }
 
