@@ -36,8 +36,12 @@ public class JettyReceive extends AbstractHandler {
     @Override
     public void handle(String url, Request baseRequest, HttpServletRequest request, HttpServletResponse response)
             throws IOException, ServletException {
-        String baseUrl="https://www.36kr.com/";
-
+        String baseUrl_noroot="https://www.36kr.com";
+        String baseUrl=baseUrl_noroot+"/";
+        if(url.indexOf(baseUrl_noroot)>-1){
+            url=url.replace(baseUrl_noroot,"");
+        }
+        System.out.println("--------------------");
         boolean isReturned=false;
         System.out.println("get a request2:"+url);
 
@@ -72,10 +76,10 @@ public class JettyReceive extends AbstractHandler {
             response.setStatus(HttpServletResponse.SC_OK);
             HttpHelper httpHelper = new HttpHelper();
             try {
-                String html = httpHelper.sentGet("https://www.36kr.com/");
+                String html = httpHelper.sentGet("https://www.36kr.com"+url);
                 GetCss getCss=new GetCss(cssCache);
                 html=getCss.getC(html);
-
+                html=html.replace(baseUrl_noroot,"");
                 response.getWriter().println(html);
 
                 //response.flushBuffer();
@@ -146,8 +150,9 @@ public class JettyReceive extends AbstractHandler {
         return ip;
     }
     private void printHeader(String url,HttpServletRequest request){
+
         System.out.println("url:" + url);
-        System.out.println("domain name:" + request.getHeader("From"));
+        //System.out.println("domain name:" + request.getHeader("From"));
         System.out.println("host name:" + request.getHeader("Host"));
         System.out.println("ip:" + getIpAdrress(request));
         //System.out.println("body:" + getBodyDate(request));
