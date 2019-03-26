@@ -68,6 +68,12 @@ public class JettyReceive extends AbstractHandler {
             isReturned=true;
 
         }
+        if(url.indexOf(".js")>-1){
+            response.setContentType("application/javascript;charset=UTF-8");
+            response.getWriter().println("var guava=0;");
+            baseRequest.setHandled(true);
+            isReturned=true;
+        }
         if(isReturned==false && url.indexOf(".ico")>-1){
             response.getWriter().println(".guava{}");
             baseRequest.setHandled(true);
@@ -90,7 +96,7 @@ public class JettyReceive extends AbstractHandler {
                     printHeader(url,request,response);
                     html = httpHelper.sentGet(baseUrl_noroot+url);
                     GetCss getCss=new GetCss(cssCache);
-                    html=getCss.getC(html);
+                    html=getCss.getC(html,baseUrl_noroot);
                     html=html.replace(baseUrl_noroot,"");
                     htmlCache.put(baseUrl_noroot+url,html);
                 }
@@ -186,11 +192,16 @@ public class JettyReceive extends AbstractHandler {
                                         .disk(20, MemoryUnit.MB, true)
                         )
                 ).build(true);
-        htmlCache = persistentCacheManager.createCache("htmlCache",
-                CacheConfigurationBuilder.newCacheConfigurationBuilder(String.class, String.class, ResourcePoolsBuilder.newResourcePoolsBuilder()
-                        .heap(10, EntryUnit.ENTRIES)
-                        .offheap(1, MemoryUnit.MB)
-                        .disk(20, MemoryUnit.MB, true)));
+        htmlCache = persistentCacheManager.getCache("htmlCache", String.class, String.class);
+        if(htmlCache==null) {
+            htmlCache = persistentCacheManager.createCache("htmlCache",
+                    CacheConfigurationBuilder.newCacheConfigurationBuilder(String.class, String.class, ResourcePoolsBuilder.newResourcePoolsBuilder()
+                            .heap(10, EntryUnit.ENTRIES)
+                            .offheap(1, MemoryUnit.MB)
+                            .disk(20, MemoryUnit.MB, true)));
+        }else {
+            System.out.println("this cache esixt:"+htmlCache.hashCode());
+        }
         return persistentCacheManager;
     }
 
