@@ -2,40 +2,32 @@ package com.guava.proxy.controller;
 
 
 import com.guava.proxy.Util.HttpHelper;
+import com.guava.proxy.Util.Redis.RedisPoolUtil;
 import com.guava.proxy.Util.SettingHelper;
 import com.guava.proxy.regex.GetCss;
 import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.handler.AbstractHandler;
-import org.ehcache.Cache;
-import org.ehcache.CacheManager;
-import org.ehcache.PersistentCacheManager;
-import org.ehcache.config.builders.CacheConfigurationBuilder;
-import org.ehcache.config.builders.CacheManagerBuilder;
-import org.ehcache.config.builders.ResourcePoolsBuilder;
-import org.ehcache.config.units.EntryUnit;
-import org.ehcache.config.units.MemoryUnit;
 import org.springframework.stereotype.Component;
+import redis.clients.jedis.Jedis;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 @Component
 public class JettyReceive extends AbstractHandler {
-    private CacheManager cm=null;
-    private Cache<String, String> cssCache=null;
-    private Cache<String, String> htmlCache=null;
+    private RedisPoolUtil cssCache=null;
+
     private SettingHelper settingHelper=new SettingHelper();
     JettyReceive(){
-        if(cm==null) {
-            cm = this.getCacheManager();
+        if(cssCache==null) {
+            System.out.println("redis 新建");
+             cssCache = new RedisPoolUtil();
         }
-        cssCache = cm.getCache("cssCache", String.class, String.class);
-
     }
+
     @Override
     public void handle(String url, Request baseRequest, HttpServletRequest request, HttpServletResponse response)
             throws IOException, ServletException {
@@ -59,16 +51,21 @@ public class JettyReceive extends AbstractHandler {
             System.out.println("found css:"+url);
             response.setContentType("text/css;charset=UTF-8");
             url=url.replace("/","");
-            if(cssCache.containsKey(url)){
-                response.getWriter().println(cssCache.get(url));
-            }else {
+            String csscode=cssCache.get(url);
+            if (csscode==null) {
                 response.getWriter().println(".guava{}");
+            } else {
+                response.getWriter().println(csscode);
             }
             baseRequest.setHandled(true);
             isReturned=true;
 
         }
-        if(url.indexOf(".js")>-1){
+        if(url.indexOf(".js")>-1 || url.indexOf(".png")>-1
+                || url.indexOf(".php")>-1
+                || url.indexOf(".jpg")>-1
+                || url.indexOf(".gif")>-1 ){
+            System.out.println("found js png php jpg");
             response.setContentType("application/javascript;charset=UTF-8");
             response.getWriter().println("var guava=0;");
             baseRequest.setHandled(true);
@@ -88,17 +85,25 @@ public class JettyReceive extends AbstractHandler {
             response.setStatus(HttpServletResponse.SC_OK);
             HttpHelper httpHelper = new HttpHelper();
             try {
-                String html =null;
-                if(htmlCache.containsKey(baseUrl_noroot+url)){
-                    html=htmlCache.get(baseUrl_noroot+url);
+                System.out.println(baseUrl_noroot+url);
+                System.out.println("begin to get cache");
+                String html =cssCache.get(baseUrl_noroot+url);
+
+                if(html!=null){
+
                     System.out.println("cache state:this html in cache");
                 }else{
+                    System.out.println("cache state:this html not in cache1");
+                    System.out.println(html);
+                    System.out.println("cache state:this html not in cache2");
                     printHeader(url,request,response);
                     html = httpHelper.sentGet(baseUrl_noroot+url);
                     GetCss getCss=new GetCss(cssCache);
                     html=getCss.getC(html,baseUrl_noroot);
                     html=html.replace(baseUrl_noroot,"");
-                    htmlCache.put(baseUrl_noroot+url,html);
+                    String seted=cssCache.set(baseUrl_noroot+url,html);
+                    System.out.println("cache html file:"+baseUrl_noroot+url);
+                    System.out.println(seted);
                 }
 
 
@@ -106,10 +111,11 @@ public class JettyReceive extends AbstractHandler {
 
                 //response.flushBuffer();
                 baseRequest.setHandled(true);
-            } catch (InterruptedException e) {
+            } catch (Exception e) {
                 e.printStackTrace();
             }
         }
+
 
     }
 
@@ -181,29 +187,6 @@ public class JettyReceive extends AbstractHandler {
         //System.out.println("body:" + getBodyDate(request));
     }
 
-    private CacheManager getCacheManager(){
-        PersistentCacheManager persistentCacheManager = CacheManagerBuilder.newCacheManagerBuilder()
-                .with(CacheManagerBuilder.persistence(new File( "myData")))
-                .withCache("cssCache",
-                        CacheConfigurationBuilder.newCacheConfigurationBuilder(String.class, String.class,
-                                ResourcePoolsBuilder.newResourcePoolsBuilder()
-                                        .heap(10, EntryUnit.ENTRIES)
-                                        .offheap(1, MemoryUnit.MB)
-                                        .disk(20, MemoryUnit.MB, true)
-                        )
-                ).build(true);
-        htmlCache = persistentCacheManager.getCache("htmlCache", String.class, String.class);
-        if(htmlCache==null) {
-            htmlCache = persistentCacheManager.createCache("htmlCache",
-                    CacheConfigurationBuilder.newCacheConfigurationBuilder(String.class, String.class, ResourcePoolsBuilder.newResourcePoolsBuilder()
-                            .heap(10, EntryUnit.ENTRIES)
-                            .offheap(1, MemoryUnit.MB)
-                            .disk(20, MemoryUnit.MB, true)));
-        }else {
-            System.out.println("this cache esixt:"+htmlCache.hashCode());
-        }
-        return persistentCacheManager;
-    }
 
 
 }
