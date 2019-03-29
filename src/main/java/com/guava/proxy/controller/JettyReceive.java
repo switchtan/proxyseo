@@ -1,14 +1,14 @@
 package com.guava.proxy.controller;
 
 
+import com.guava.proxy.HtmlParser.Jsoup.PageInject;
 import com.guava.proxy.Util.HttpHelper;
 import com.guava.proxy.Util.Redis.RedisPoolUtil;
 import com.guava.proxy.Util.SettingHelper;
-import com.guava.proxy.regex.GetCss;
+import com.guava.proxy.HtmlParser.regex.GetCss;
 import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.handler.AbstractHandler;
 import org.springframework.stereotype.Component;
-import redis.clients.jedis.Jedis;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
@@ -32,27 +32,29 @@ public class JettyReceive extends AbstractHandler {
     public void handle(String url, Request baseRequest, HttpServletRequest request, HttpServletResponse response)
             throws IOException, ServletException {
 
-        String baseUrl_noroot=settingHelper.get("localhost");
-        System.out.println(request.getHeader("Host"));
-        System.out.println(baseUrl_noroot);
+        System.out.println("--------------------");
+        String baseUrl_noroot=settingHelper.get(request.getHeader("Host"));
+        System.out.println("request from:"+request.getHeader("Host"));
+        System.out.println("mapping site:"+baseUrl_noroot);
         String baseUrl=baseUrl_noroot+"/";
         if(url.indexOf(baseUrl_noroot)>-1){
             url=url.replace(baseUrl_noroot,"");
         }
-        System.out.println("--------------------");
+
         boolean isReturned=false;
         System.out.println("get a request2:"+url);
 
 //        Pattern p = Pattern.compile(".*\\.css");
 //        Matcher m=p.matcher(url);
         //if(m.find()){
-
-        if(url.indexOf(".css")>-1){
+        
+        if(url.indexOf(".css")>-1 ){
             System.out.println("found css:"+url);
             response.setContentType("text/css;charset=UTF-8");
             url=url.replace("/","");
             String csscode=cssCache.get(url);
             if (csscode==null) {
+                System.out.println(url);
                 response.getWriter().println(".guava{}");
             } else {
                 response.getWriter().println(csscode);
@@ -61,11 +63,11 @@ public class JettyReceive extends AbstractHandler {
             isReturned=true;
 
         }
-        if(url.indexOf(".js")>-1 || url.indexOf(".png")>-1
+        if( url.indexOf(".png")>-1
                 || url.indexOf(".php")>-1
                 || url.indexOf(".jpg")>-1
                 || url.indexOf(".gif")>-1 ){
-            System.out.println("found js png php jpg");
+            System.out.println("found  png php jpg");
             response.setContentType("application/javascript;charset=UTF-8");
             response.getWriter().println("var guava=0;");
             baseRequest.setHandled(true);
@@ -94,16 +96,23 @@ public class JettyReceive extends AbstractHandler {
                     System.out.println("cache state:this html in cache");
                 }else{
                     System.out.println("cache state:this html not in cache1");
-                    System.out.println(html);
-                    System.out.println("cache state:this html not in cache2");
+
                     printHeader(url,request,response);
                     html = httpHelper.sentGet(baseUrl_noroot+url);
+                    System.out.println(html);
+                    System.out.println("cache state:this html not in cache2");
                     GetCss getCss=new GetCss(cssCache);
                     html=getCss.getC(html,baseUrl_noroot);
                     html=html.replace(baseUrl_noroot,"");
-                    String seted=cssCache.set(baseUrl_noroot+url,html);
+                    html= PageInject.injectHead(html);
+                    if(baseUrl_noroot+url=="http://www.bismara22.com/"){
+                        System.out.println("bismara22:setEx");
+                        String seted = cssCache.setEx(baseUrl_noroot + url,html,60*5);
+                    }else {
+                        String seted = cssCache.set(baseUrl_noroot + url, html);
+                    }
                     System.out.println("cache html file:"+baseUrl_noroot+url);
-                    System.out.println(seted);
+
                 }
 
 
@@ -182,7 +191,7 @@ public class JettyReceive extends AbstractHandler {
         System.out.println("url:" + url);
         //System.out.println("domain name:" + request.getHeader("From"));
         System.out.println("host name:" + request.getHeader("Host"));
-        System.out.println("host name:" + response.getHeader("Location"));
+
         System.out.println("ip:" + getIpAdrress(request));
         //System.out.println("body:" + getBodyDate(request));
     }
